@@ -56,6 +56,7 @@ def f(x):
 
 import time
 
+
 start = time.time()
 f(b1000data)
 end = time.time()
