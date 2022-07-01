@@ -1,41 +1,49 @@
-import modules
-from modules import *
+import math
+
 import torch
 import torch.nn as nn
+import torch.nn.init as init
+
+from modules import *
+import time
 
 
-c = torch.randn(3, 1, 4, 4, 4)
-wf = torch.randn(10, 8)
-wg = torch.randn(10, 8)
 
-class model(nn.Module) :
-    def __init__(self, wg ):
+class model(nn.Module):
+    def __init__(self, n1, n2, n3, k_size):
         super().__init__()
-        self.poly = Poly_Kernel(wg, kernel_size=2)
-        self.conv1 = nn.Conv3d(kernel_size=1,in_channels=10,out_channels = 20 )
+        wg0 = torch.zeros(n2, n1 * k_size[0] ** 3)
+        wg1 = torch.randn(n3, n2 * k_size[1] ** 3)  # , torch.randn(n3,n4)
+        init.kaiming_uniform_(wg0, a=math.sqrt(5))
+        init.kaiming_uniform_(wg1, a=math.sqrt(5))
+        # init.kaiming_uniform_(wg2, a=math.sqrt(5) )
+        self.poly1 = Poly_Kernel(wg0, kernel_size=k_size[0])
+        self.conv1 = nn.Conv3d(kernel_size=1, in_channels=n2, out_channels=n2)
+        self.poly2 = Poly_Kernel(wg1, kernel_size=k_size[1])
+        self.conv2 = nn.Conv3d(kernel_size=1, in_channels=n3, out_channels=n3)
+
     def forward(self, x):
-        y = self.poly(x)
+        y = self.poly1(x)
         y = self.conv1(y)
+        y = self.poly2(y)
+        y = self.conv2(y)
         return y
 
 
+test = model(n1=6, n2=10, n3=4, k_size=[3, 3])
+cuda0 = torch.device("cuda:0")
+test.to(cuda0)
+for i in range(10) :
+    c = torch.randn(30, 6, 40, 40, 40)
+    c = c.to(cuda0)
 
-c = torch.randn(3, 1, 4, 4, 4)
-wf = torch.randn(10, 8)
-wg = torch.randn(10, 8)
+    start = time.time()
+    print(test(c).shape)
+    end = time.time()
+    print(end-start)
 
-test = model(wg=wg)
+
 # poly = Poly_Kernel(wf,kernel_size=2)
 # print( poly(c).shape )
-
-print(test(c).shape)
-
-
-
-# poly = Poly_Kernel(wf,kernel_size=2)
-# print( poly(c).shape )
-gauss = Gaussian_Kernel(wg, kernel_size=2)
+# gauss = Gaussian_Kernel(wg, kernel_size=2)
 # print(gauss(c).shape)
-#
-# conv3d = nn.Conv3d(in_channels = 10, out_channels=20, kernel_size = 1)
-# print(conv3d(gauss(c)).shape)

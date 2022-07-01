@@ -7,7 +7,6 @@ import torch.nn as nn
 import torch.nn.parameter
 import unfoldNd
 
-
 class Poly_Kernel(nn.Module):
     def __init__(self, w_init, kernel_size, dilation=1, stride=1, padding=0):
         super().__init__()
@@ -16,12 +15,21 @@ class Poly_Kernel(nn.Module):
         self.dilation = dilation
         self.padding = padding
         self.stride = stride
+    def __compute_shape(self, x):
+        h = (x.shape[2] - self.kernel_size[0] + 2 * self.padding[0]) // self.stride[0] + 1
+        w = (x.shape[3] - self.kernel_size[1] + 2 * self.padding[1]) // self.stride[1] + 1
+        return h, w
 
     def forward(self, x):
         s1, s2, s3, s4, s5 = x.shape
+        dox = ( s3 - self.kernel_size + 2*self.padding ) // self.stride + 1
+        doy = ( s4 - self.kernel_size + 2*self.padding ) // self.stride + 1
+        doz = ( s5 - self.kernel_size + 2*self.padding ) // self.stride + 1
         y = unfoldNd.unfoldNd(x, kernel_size=self.kernel_size, dilation=self.dilation, stride=self.stride, padding=0)
+        # print( "yshape", y.shape)
         y = (torch.einsum('ij,kjm->kim', self.w, y) + 1) ** 2
-        return y.view(s1, -1, s3 - 1, s4 - 1, s5 - 1).contiguous()
+        # print("yshape", y.shape)
+        return y.view( s1, -1, dox, doy, doz).contiguous()
 
 
 class Gaussian_Kernel(nn.Module):
