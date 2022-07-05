@@ -33,14 +33,14 @@ class model(nn.Module):
 test = model(n1=6, n2=10, n3=4, k_size=[3, 3])
 cuda0 = torch.device("cuda:0")
 test.to(cuda0)
-for i in range(10) :
-    c = torch.randn(30, 6, 40, 40, 40)
-    c = c.to(cuda0)
-
-    start = time.time()
-    print(test(c).shape)
-    end = time.time()
-    print(end-start)
+# for i in range(10) :
+#     c = torch.randn(30, 6, 40, 40, 40)
+#     c = c.to(cuda0)
+#
+#     start = time.time()
+#     print(test(c).shape)
+#     end = time.time()
+#     print(end-start)
 
 
 # poly = Poly_Kernel(wf,kernel_size=2)
