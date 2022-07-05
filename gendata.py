@@ -27,17 +27,20 @@ bvecs = np.loadtxt(os.path.join(path, '3104_BL_bvecs'))
 is_b0 = ( abs(bvals) < 0.0001 )
 is_b1000 = ( abs(bvals-1000) < 0.0001 )
 svecs = bvecs[:,is_b1000]
+svecs = np.concatenate((svecs,-svecs),axis=1)
 data = nibabel.load(os.path.join(path,'3104_BL_data_subject_space.nii.gz'))
 ndata = np.array(data.dataobj)
 
 b0data = ndata[:,:,:,is_b0]
 b1000data = ndata[:,:,:,is_b1000]
+
+
 _,theta,phi = geometry.cart2sphere( svecs[0,:], svecs[1,:], svecs[2,:])
 theta,phi = np.mod(theta,np.pi), np.mod(phi,2*np.pi)
 # print(np.min(theta)/PI,np.max(theta)/PI)
 # print(np.min(phi)/PI,np.max(phi)/PI)
 
-ftheta, fphi = S2.meshgrid(b=30,grid_type="Driscoll-Healy")
+ftheta, fphi = S2.meshgrid(b=20,grid_type="Driscoll-Healy")
 ftheta, fphi = ftheta.reshape(-1), fphi.reshape(-1)
 t1 = ftheta.shape[0]
     #np.linspace( 0, PI, t1 ), np.linspace( 0, 2*PI, t1 )
@@ -49,12 +52,12 @@ def f(x):
     s1,s2,s3,s4 = x.shape
     print(x.shape)
     fdata = np.zeros((s1,s2,s3,t1 ),dtype=np.float32)
-    print( fdata.nbytes/(1024**2))
+    print( fdata.nbytes/(1024**3))
     for i in range(s1) :
         print(i)
         for j in range(s2) :
             for k in range(s3) :
-                ff = ipl.LSQSphereBivariateSpline(theta, phi, x[i,j,k], knot_theta, knot_phi)
+                ff = ipl.LSQSphereBivariateSpline(theta, phi, np.repeat(x[i,j,k],2), knot_theta, knot_phi)
                 fdata[i,j,k] = ff(ftheta,fphi,grid=False)
 
 
