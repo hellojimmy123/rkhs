@@ -1,8 +1,10 @@
+import random
 import torch 
 import torch.optim as optim
 from torch.optim.lr_scheduler import StepLR
 
-
+import os 
+import json
 import numpy as np 
 from models import *
 from torch.nn import DataParallel as DP
@@ -30,7 +32,7 @@ class NET( nn.Module ) :
 
 gpu = torch.device('cuda:0')
 cpu = torch.device('cpu') 
-npoch = 20 
+npoch = 10
 
 laps = get_healpix_laplacians( 192, 2, 'combinatorial')
 kernel_size = [ 3, 3, 3, 3  ]
@@ -50,29 +52,50 @@ ll = linear_layer().to(gpu)
 net = NET(  rkdp, s2dp, ll ) 
 #x = torch.randn( 192, 1, 77, 95, 77 ).to( gpu )
 
+f = open('tmp.txt','w') 
 
-tot_file_list = get_file_list() 
-train_file_list = tot_file_list[:280]
-test_file_list = tot_file_list[280:]
-print(  test_file_list ) 
+with open('test.json','r') as gf :
+    tmp_list = json.load( gf ) 
+
+train_file_list = [] 
+test_file_list = [] 
+
+
+for i in tmp_list[0] :
+    test_file_list.append(  (os.path.join('../../mix', str(i) + '.pt' ), os.path.join('../../mix', str(i) + '.label' )) )
+for i in tmp_list[1] :
+    train_file_list.append( ( os.path.join('../../mix', str(i) + '.pt' ), os.path.join('../../mix', str(i) + '.label' )) )
+
+#tot_file_list = get_file_list() 
+#train_file_list = tot_file_list[:280]
+#test_file_list = tot_file_list[280:]
+
+for item in test_file_list :
+    tmp = item[0] 
+    f.write(  tmp + '  ' )
+f.write('\n')  
 
 nts = non_torch_data_set( train_file_list, gpu, bf_size = 80 )
+random.shuffle( train_file_list )
 ntsb = non_torch_data_set( train_file_list, gpu, bf_size = 80 )
+random.shuffle( train_file_list )
+
 #tnts = non_torch_data_set( test_file_list, gpu, bf_size = 40 ) 
 tds = no_cache_loading( test_file_list ) 
 
 start_t = time.time()
 loss_func = nn.CrossEntropyLoss()  
-optimizer = optim.SGD( net.parameters(), lr = 1.0e-3 ) 
+optimizer = optim.SGD( net.parameters(), lr = 5.0e-4, momentum = 0.9 ) 
 #optimizer = optim.Adam( net.parameters(), lr = 1.0e-3 ) 
-scheduler = StepLR(optimizer, step_size=1, gamma=0.7)
+scheduler = optim.lr_scheduler.ExponentialLR(optimizer,  gamma=0.99)
 
 
 for epoch in range(npoch):
-    optimizer.zero_grad() 
-    print( 'epoch  ', epoch ) 
+    f.write( 'epoch  {0:d}\n'.format(epoch)  ) 
+    tot_loss = 0. 
     for i in range(280):
-        print( i, end = '  ' ) 
+        optimizer.zero_grad() 
+        f.write(  ' {0:d} '.format(i) ) 
        # print('\r', i, ' /280', end = ' ') 
         x, label = nts.get()
         label = label.unsqueeze(0).to(gpu)  
@@ -80,16 +103,20 @@ for epoch in range(npoch):
         y = net(x[:192])
        # print( 'running') 
         loss = loss_func( y, label ) 
-        loss.backward() 
+        loss.backward()
+        tot_loss += loss
+        optimizer.step()  
+        f.write( '{0:.10e}  {1:.10e} {2:.10e}  \n'.format(y[0,0],y[0,1], loss ) ) 
         #optimizer.step() 
         #print( time.time() - start_t )
-    print() 
+        f.flush() 
+    f.write('Loss: {0:.10e}\n\n\n'.format(tot_loss))
     scheduler.step()  
-    optimizer.step() 
     nts.end_thread()
     nts = ntsb 
     if( epoch < npoch-2 ) : 
         ntsb = non_torch_data_set( train_file_list, gpu, bf_size = 100 )
+        random.shuffle( train_file_list )
     
 #nts.end_thread() 
     tot = len(tds)  
@@ -102,7 +129,8 @@ for epoch in range(npoch):
             pred = y.argmax().to(cpu)  
             true_val = label.argmax()
             is_cor = pred.eq( true_val )
-            print( i, is_cor ) 
+            f.write( ' {0:d} '.format(i) + str(is_cor) + '\n' ) 
             cor += is_cor 
-        print( cor/tot )
-
+        f.write( 'Accuracy : {0:.3f}'.format(cor/tot) + '\n' )
+    f.flush() 
+f.close() 
